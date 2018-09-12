@@ -1,0 +1,97 @@
+var url = ($context.safari ? $context.safari.items.baseURI : null) || $context.link || $clipboard.link;
+ 
+if (!url) {
+  $ui.alert("请在Safari扩展打开");
+  return;
+}
+
+async function eval(js) {
+  return new Promise(function(resolve, reject) {
+    $("webView").eval({
+      script: js,
+      handler: (result, error) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(result);
+        }
+      }
+    });
+  });
+}
+
+async function wait(milliseconds) {
+  await new Promise(function(resolve, reject) {
+    $delay(milliseconds / 1000, function() {
+      resolve();
+    });
+  });
+}
+
+async function start() {
+  var contaierView = $("contaierView");
+  var webView = $("webView");
+  var pageHeight = await eval("document.documentElement.scrollHeight");
+
+  if (pageHeight > contaierView.frame.height) {
+    webView.remakeLayout(make => {
+      make.left.top.right.inset(0);
+      make.height.equalTo(pageHeight);
+    });
+    webView.relayout();
+  }
+  
+  await wait(500);
+  
+  var snapshot = webView.snapshot;
+  
+  webView.remakeLayout((make, view) => {
+    make.left.top.right.inset(0);
+    make.height.equalTo(view.super);
+  });
+  webView.relayout();
+  
+  $share.sheet(snapshot);
+}
+
+$ui.render({
+  views: [{
+      type: "view",
+      props: {
+        id: "contaierView",
+        clipsToBounds: true
+      },
+      views: [{
+        type: "web",
+        props: {
+          id: "webView",
+          url: url
+        },
+        layout: (make, view) => {
+          make.left.top.right.inset(0);
+          make.height.equalTo(view.super);
+        }
+      }],
+      layout: (make, view) => {
+        make.left.top.right.inset(0);
+      }
+    },
+    {
+      type: "button",
+      props: {
+        title: "开始截屏"
+      },
+      layout: (make, view) => {
+        make.left.right.inset(20);
+        make.top.equalTo(view.prev.bottom).offset(10);
+        make.bottom.inset(10);
+        make.height.equalTo(40);
+      },
+      events: {
+        tapped: async sender => {
+          await start();
+        }
+      }
+    }
+  ]
+});
